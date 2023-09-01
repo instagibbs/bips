@@ -274,8 +274,8 @@ If none of the conditions fail, the minimally-encoded difference between input s
 === <code>OP_REVAULT</code> evaluation ===
 
 <source>
-<revault-vout-idx>
 <revault-amount>
+<revault-vout-idx>
 </source>
 
 where
