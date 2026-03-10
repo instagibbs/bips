@@ -1,7 +1,7 @@
 ```
   BIP: ?
   Layer: Consensus (soft fork)
-  Title: Next-transaction and Rebindable Signatures
+  Title: a Taproot-native (re)bindable transaction proposal
   Authors: Gregory Sanders <gsanders87@gmail.com>
            Antoine Poinsot <mail@antoinep.com>
            Steven Roose <steven@stevenroose.org>
@@ -12,8 +12,8 @@
 
 ## Abstract
 
-This document proposes bundling three new operations for [Tapscript][tapscript-bip]:
-[`OP_TEMPLATEHASH`][templatehash-bip], [`BIP348 OP_CHECKSIGFROMSTACK`][csfs-bip], and [`BIP349 OP_INTERNALKEY`][internalkey-bip].
+This document proposes deploying three new operations for [Tapscript][tapscript-bip]:
+[BIP 446 `OP_TEMPLATEHASH`][templatehash-bip], [BIP 348 `OP_CHECKSIGFROMSTACK`][csfs-bip], and [BIP 349 `OP_INTERNALKEY`][internalkey-bip].
 
 These minimal operations introduce modular functionalities which improve existing second layer protocols and make new
 ones possible through plausible interactivity requirements.
@@ -24,27 +24,34 @@ The three proposed operations are simple, well-understood, and enable powerful n
 risk of surprising behavior or unintended applications. They improve existing, well-studied protocols and make promising
 new ones possible.
 
-`OP_TEMPLATEHASH` enables committing to the transaction spending an output. `OP_CHECKSIGFROMSTACK` enables
-[BIP340][schnorr-bip] signature verification of arbitrary messages. `OP_INTERNALKEY` allows to push the
-[Taproot][taproot-bip] internal key on the stack.
+`OP_TEMPLATEHASH` allows a Tapscript to commit to the exact transaction that must spend it. This capability is a common
+building block for second-layer protocols that is emulated today by requiring a signature from all involved parties.
+Using `OP_TEMPLATEHASH` instead reduces interactivity, making such protocols simpler, safer, and sometimes significantly
+more efficient.
 
-The ability to commit to the future transaction spending an output is useful to reduce interactivity in second-layer
-protocols. For instance it can [reduce roundtrips][symmetric-greg] in the implementation of [LN-Symmetry][optech-eltoo], or make
-creating an [Ark][optech-ark] "VTXO" [non-interactive][ark-case-ctv]. Additionally, it enables [significant
-optimizations][fournier-dlc-ctv] in the implementation of [Discreet Log Contracts][optech-dlcs].
+`OP_CHECKSIGFROMSTACK` introduces [BIP 340][schnorr-bip] signature verification for arbitrary messages, which enables
+delegation and oracle attestations.
 
-The ability to verify a signature for an arbitrary message in Tapscript enables delegation and oracle attestations. This capability can
-for instance [significantly reduce][bitvm-ctv-csfs] the onchain footprint of [BitVM][bitvm-website]. Reducing the onchain
-footprint of an application is beneficial to users of Bitcoin especially as it reduces economic demand for
-extremely large transactions that induce further mining centralization pressures[^large-txs-mining-centralization].
-
-Together, these features enable rebindable transaction signatures, making possible a new type of payment channel: LN-Symmetry ("Eltoo").
-Its simplicity makes advanced constructs like multiparty channels practical, while also enabling simplifications of 2-party channels such as [Daric][daric-channels]. The same techniques can also substantially improve [statechains][statechains-optech]. Rebindable signatures also enable further interactivity reduction
-in second layer protocols, as illustrated by the Ark variant "[Erk][ark-erk]" or the [dramatic simplification][greg-rebindable-ptlcs]
+Together, these features enable rebindable transaction signatures, making possible a new type of payment channel:
+[LN-Symmetry ("Eltoo")][optech-eltoo]. Its simplicity makes advanced constructs like multiparty channels practical,
+enables simplifications for 2-party channels such as [Daric][daric-channels], and can substantially improve
+[statechains][statechains-optech]. Rebindable signatures also enable further interactivity reduction in second layer
+protocols, as illustrated by the Ark variant "[Erk][ark-erk]" or the [dramatic simplification][greg-rebindable-ptlcs]
 they bring to upgrading today's Lightning to [Point Time Locked Contracts][optech-ptlcs].
 
-The ability to push the Taproot internal key on the stack is a natural and extremely simple optimisation for rebindable
-signatures.
+`OP_INTERNALKEY` allows to push the [Taproot][taproot-bip] internal key on the stack. This is a natural and extremely
+simple optimisation for rebindable signatures.
+
+## Specification
+
+In BIP 342 Tapscript, the following operations are updated. `OP_TEMPLATEHASH` redefines `OP_SUCCESS206` (0xce) as per
+the specification of [BIP 446][templatehash-bip]. `OP_CHECKSIGFROMSTACK` redefines `OP_SUCCESS204` (0xcc) as per the
+specification of [BIP 348][csfs-bip]. `OP_INTERNALKEY` redefines `OP_SUCCESS203` (0xcb) as per the specification of [BIP
+349][internalkey-bip].
+
+### Deployment
+
+The specific activation is left to be determined at a later date.
 
 ## Rationale
 
@@ -54,22 +61,15 @@ these capabilities are contained within the more modern and well-studied Tapscri
 and unlikely to be made obsolete by future extensions to Bitcoin Script. They build upon existing operations and
 therefore present a minimal cost to validation and implementation complexity.
 
-More modular operations (such as [BIP346][txhash-bip]) also enable these capabilities, and more. However they also present
-more implementation complexity and introduce more risks of enabling, or substantially simplifying, undesirable
-applications. As the additional capabilities have not been demonstrated to enable new important use cases or
-substantially improve existing ones, this proposal favours the minimal approach.
+More modular operations (such as [BIP 346][txhash-bip]) also enable these capabilities, and more. However they come with
+an increased risk surface, notably in terms of implementation complexity. As the additional capabilities have not been
+demonstrated to enable new important use cases or substantially improve existing ones beyond this proposal, we favour
+the minimal approach.
 
-`OP_TEMPLATEHASH` enables the same capability [BIP119][ctv-bip]'s `OP_CHECKTEMPLATEVERIFY` does. The former is preferred because:
-- it does not unnecessarily modify legacy scripting contexts;
-- the template hashed minimally departs from Taproot signature hashes, simplifying the implementation
-  and, importantly, committing to the Taproot annex;
-- it does not limit itself to the verify semantic required by the legacy `OP_NOP` upgrade hooks, making rebindable
-  signatures usage more efficient;
-- it prevents surprising interactions with programs in a transaction input's `scriptSig`.
-
-## Implementation
-
-[`OP_TEMPLATEHASH`][templatehash-bip], [`BIP348 OP_CHECKSIGFROMSTACK`][csfs-bip], and [`BIP349 OP_INTERNALKEY`][internalkey-bip] implemented as specified in their corresponding documents.
+An alternative to [BIP 446 `OP_TEMPLATEHASH`][templatehash-bip] is [BIP 119 `OP_CHECKTEMPLATEVERIFY`][ctv-bip]. This
+proposal favours the minimal approach of [BIP 446 `OP_TEMPLATEHASH`][templatehash-bip] that does not modifiy legacy
+scripting contexts and reuses the existing Taproot signature hashes. See [the rationale section of BIP
+446][templatehash-rationale] for more details.
 
 ## Backward compatibility
 
@@ -88,11 +88,8 @@ This proposal is similar to the combination of opcodes Brandon Black previously
 
 This document is licensed under the Creative Commons CC0 1.0 Universal license.
 
-[^large-txs-mining-centralization]: Large transactions are difficult to relay through the p2p network as they make it
-harder for nodes to reason about miners' block templates. This may lead to a situation where such transactions get
-submitted directly to miners. See [this discussion][sipa-large-txs] for more details.
-
-[templatehash-bip]: bip-templatehash.md
+[templatehash-bip]: bip-0446.md
+[templatehash-rationale]: bip-0446.md#rationale
 [ctv-bip]: bip-0119.mediawiki
 [csfs-bip]: bip-0348.md
 [internalkey-bip]: bip-0349.md
@@ -106,11 +103,8 @@ submitted directly to miners. See [this discussion][sipa-large-txs] for more det
 [txhash-bip]: https://github.com/bitcoin/bips/pull/1500
 [symmetric-greg]: https://delvingbitcoin.org/t/ln-symmetry-project-recap/359
 [ark-case-ctv]: https://delvingbitcoin.org/t/the-ark-case-for-ctv/1528
-[bitvm-ctv-csfs]: https://delvingbitcoin.org/t/how-ctv-csfs-improves-bitvm-bridges/1591
-[sipa-large-txs]: https://delvingbitcoin.org/t/non-confiscatory-transaction-weight-limit/1732/8
 [ark-erk]: https://delvingbitcoin.org/t/evolving-the-ark-protocol-using-ctv-and-csfs/1602
-[greg-rebindable-ptlcs]: https://delvingbitcoin.org/t/ctv-csfs-can-we-reach-consensus-on-a-first-step-towards-covenants/1509/18
+[greg-rebindable-ptlcs]: https://gist.github.com/instagibbs/1d02d0251640c250ceea1c66665ec163
 [fournier-dlc-ctv]: https://gnusha.org/pi/bitcoindev/CAH5Bsr2vxL3FWXnJTszMQj83jTVdRvvuVpimEfY7JpFCyP1AZA@mail.gmail.com
-[bitvm-website]: https://bitvm.org
 [daric-channels]: https://eprint.iacr.org/2022/1295
 [statechains-optech]: https://bitcoinops.org/en/topics/statechains/
